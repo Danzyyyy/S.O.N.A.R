@@ -1,0 +1,32 @@
+services:
+  chromadb:
+    image: chromadb/chroma:0.5.18
+    container_name: chroma_vector_store
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+
+  rag-app:
+    build: .
+    container_name: rag_sentiment_app
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    environment:
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - LLM_MODEL=llama3.2
+      - EMBED_MODEL=nomic-embed-text
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - chromadb
+
+volumes:
+  chroma_data:

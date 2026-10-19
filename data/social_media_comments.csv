@@ -1,0 +1,31 @@
+id,timestamp,platform,username,comment,sentiment,topic,likes
+1,2026-10-15,X,@budi_santoso,"Gagal bayar QRIS mulu dari tadi pagi di merchant, saldo kepotong tapi status di kasir pending! Parah banget update versi 2.4 ini.",negative,payment_issue,142
+2,2026-10-15,Instagram,@anisa.rachma,"Baru aja update aplikasi ke versi 2.4, langsung force close tiap buka menu riwayat transaksi. Tolong fix min @paydigital.id",negative,app_bug,89
+3,2026-10-15,TikTok,@rendy_tech,"Review fitur split bill baru di PayDigital, UI-nya makin clean dan gampang dipake bareng temen nongkrong!",positive,feature_praise,420
+4,2026-10-15,X,@fajar_ramadhan,"Hubungi CS via live chat dari 3 jam lalu cuma dijawab bot muter-muter doang. Mana uang transferan belum masuk!",negative,customer_service,215
+5,2026-10-16,YouTube,@dimas_gadget,"Fitur dark mode di update terbaru lumayan hemat baterai di layar AMOLED, tapi animasi transisinya masih agak patah-patah.",neutral,feature_praise,56
+6,2026-10-16,X,@siti_khadijah,"Tolong dong @paydigital.id uang saya 500rb nyangkut pas top up via Virtual Account Bank BCA, notif sukses tapi saldo 0!",negative,payment_issue,310
+7,2026-10-16,Instagram,@kevin_pratama,"Aplikasi kok makin berat ya setelah update versi 2.4? Buka kamera scan QRIS aja butuh loading 10 detik.",negative,app_bug,178
+8,2026-10-16,TikTok,@nadia_lifestyle,"Suka banget sama promo cashback 50% jajan boba pake PayDigital hari ini, proses checkout cepet!",positive,feature_praise,850
+9,2026-10-16,X,@indra_kusuma,"Customer care via telepon sibuk terus, DM di X gak dibales sama sekali. Padahal butuh refund urgent!",negative,customer_service,95
+10,2026-10-17,X,@maya_putri,"Udah 2 hari transaksi QRIS sering timeout padahal koneksi internet 5G lancar jaya. Apa servernya lagi down massal?",negative,payment_issue,405
+11,2026-10-17,YouTube,@review_fintech_id,"Bedah tuntas update aplikasi PayDigital v2.4: Fitur investasi reksadana otomatis sangat membantu buat pemula.",positive,feature_praise,620
+12,2026-10-17,Instagram,@dewi_lestari,"Notifikasi pop-up promo sering muncul padahal udah dimatiin di pengaturan. Agak mengganggu sih.",neutral,app_bug,45
+13,2026-10-17,TikTok,@bayu_skakmat,"CS PayDigital akhirnya gercep juga bantu buka blokir akun saya dalam 15 menit via email resmi. Makasih kak Sarah CS!",positive,customer_service,280
+14,2026-10-17,X,@rizky_ananda,"Mau bayar tagihan listrik PLN gagal terus dibilang sistem bilyet sibuk. Giliran denda telat siapa yang nanggung?",negative,payment_issue,160
+15,2026-10-17,Instagram,@citra_ayu,"Setelah update semalam hp jadi anget pas buka aplikasi PayDigital lebih dari 5 menit. Memori makan sampe 1.2 GB.",negative,app_bug,230
+16,2026-10-18,X,@hendra_wijaya,"Tolong investigasi bug QRIS double debit! Belanja di Indomaret kena potong 2 kali, kasir cuma nerima 1 struk.",negative,payment_issue,512
+17,2026-10-18,TikTok,@clarissa_vlog,"Tutorial transfer gratis antar bank pake PayDigital, praktis bgt gak perlu biaya admin lagi!",positive,feature_praise,1120
+18,2026-10-18,YouTube,@ari_subekti,"Penjelasan teknis kenapa gateway pembayaran error di versi 2.4, semoga developer segera rilis patch hotfix.",neutral,payment_issue,180
+19,2026-10-18,X,@dani_setiawan,"Customer service via WhatsApp centang hijau slow response banget, nunggu antrian dari nomor 45 gak maju-maju.",negative,customer_service,135
+20,2026-10-18,Instagram,@linda_marina,"Icon aplikasi baru lebih fresh dan modern warnanya, tapi tolong bug login fingerprint segera diberesin ya.",neutral,feature_praise,74
+21,2026-10-18,X,@eko_prasetyo,"Fix ini server backend-nya bermasalah setelah migrasi cloud weekend kemarin. Request API payment banyak yang HTTP 504 Gateway Timeout.",negative,app_bug,340
+22,2026-10-19,TikTok,@vina_pandu,"Guys hati-hati kalau bayar parkir pake QRIS PayDigital tadi pagi, banyak yg error saldo kepotong tapi gate gak kebuka!",negative,payment_issue,940
+23,2026-10-19,X,@gilang_romadhon,"Keren sih ada fitur AI financial advisor di update 2.4, bisa kasih saran alokasi budgeting bulanan secara otomatis.",positive,feature_praise,315
+24,2026-10-19,Instagram,@mega_utami,"Minta reset PIN akun dari kemarin verifikasi wajah gagal terus, CS gak bisa kasih solusi alternatif selain suruh coba lagi.",negative,customer_service,188
+25,2026-10-19,YouTube,@tekno_indo_channel,"Uji coba performa aplikasi PayDigital v2.4 di Android vs iOS: Masalah lag kamera scan barcode ternyata dominan di Android.",neutral,app_bug,410
+26,2026-10-19,X,@bagus_firmansyah,"Kenapa tiap habis ganti jaringan dari WiFi ke seluler aplikasi auto logout sendiri ya? Tolong bug session login diperbaiki.",negative,app_bug,125
+27,2026-10-19,X,@putri_wulandari,"Refund transaksi QRIS yang nyangkut tanggal 15 Oktober kemarin akhirnya cair hari ini. Makasih tim penanganan komplain.",positive,customer_service,88
+28,2026-10-19,TikTok,@aldy_satria,"Mending tahan dulu update ke versi 2.4 kalau kalian sering transaksi mobile banking dan QRIS, masih banyak bug fatal.",negative,payment_issue,670
+29,2026-10-19,Instagram,@tari_safitri,"Desain tab promo baru rapi banget, gampang nyari voucher diskon makanan di sekitar kita.",positive,feature_praise,195
+30,2026-10-19,X,@wahyu_kurniawan,"CS bot AI-nya kaku banget jawabannya gak nyambung sama keluhan gagal transfer real-time BI-Fast. Butuh agent manusia!",negative,customer_service,240
