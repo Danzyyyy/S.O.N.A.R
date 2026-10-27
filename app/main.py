@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+KNOWLEDGE_BASE_PATH = os.environ.get("KNOWLEDGE_BASE_PATH", "/app/knowledge-base")
 
 app = FastAPI(
     title="S.O.N.A.R Social Media Chatbot API",
@@ -32,7 +33,8 @@ class MessageItem(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str = Field(..., description="Pesan atau pertanyaan dari pengguna")
+    message: Optional[str] = Field(default=None, description="Pesan atau pertanyaan dari pengguna")
+    messages: Optional[List[MessageItem]] = Field(default=None, description="Daftar pesan percakapan")
     history: Optional[List[MessageItem]] = Field(default=[], description="Riwayat percakapan sebelumnya")
     temperature: Optional[float] = Field(default=0.2, ge=0.0, le=1.0, description="Kreativitas model LLM")
     model: Optional[str] = Field(default=None, description="Nama model Ollama yang dipilih pengguna")
@@ -78,6 +80,9 @@ async def health_check():
 @app.post("/api/chat", response_model=ChatResponse, tags=["Chat"])
 async def chat_endpoint(payload: ChatRequest):
     """Mengirim pesan chat ke Ollama dan mendapatkan jawaban lengkap."""
+    if not payload.message and not payload.messages:
+        raise HTTPException(status_code=400, detail="messages kosong")
+
     messages = []
     selected_model = payload.model or OLLAMA_MODEL
     
@@ -95,8 +100,11 @@ async def chat_endpoint(payload: ChatRequest):
         for item in payload.history:
             messages.append({"role": item.role, "content": item.content})
 
-    # Tambahkan pertanyaan terkini
-    messages.append({"role": "user", "content": payload.message})
+    if payload.messages:
+        for item in payload.messages:
+            messages.append({"role": item.role, "content": item.content})
+    elif payload.message:
+        messages.append({"role": "user", "content": payload.message})
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -128,8 +136,12 @@ async def chat_endpoint(payload: ChatRequest):
 
 
 @app.post("/api/chat/stream", tags=["Chat"])
+@app.post("/chat/stream", tags=["Chat"])
 async def chat_stream_endpoint(payload: ChatRequest):
     """Streaming respons chat dari Ollama secara real-time via Server-Sent Events (SSE)."""
+    if not payload.message and not payload.messages:
+        raise HTTPException(status_code=400, detail="messages kosong")
+
     messages = []
     selected_model = payload.model or OLLAMA_MODEL
 
@@ -143,7 +155,11 @@ async def chat_stream_endpoint(payload: ChatRequest):
     if payload.history:
         for item in payload.history:
             messages.append({"role": item.role, "content": item.content})
-    messages.append({"role": "user", "content": payload.message})
+    if payload.messages:
+        for item in payload.messages:
+            messages.append({"role": item.role, "content": item.content})
+    elif payload.message:
+        messages.append({"role": "user", "content": payload.message})
 
     async def event_generator():
         try:

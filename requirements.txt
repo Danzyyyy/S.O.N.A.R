@@ -11,3 +11,4 @@ chromadb==0.5.18
 pandas==2.2.3
 streamlit==1.40.0
 pyarrow<19.0.0
+pypdf==5.1.0

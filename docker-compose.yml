@@ -25,6 +25,7 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+      - ./knowledge-base:/app/knowledge-base
     environment:
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
@@ -32,6 +33,7 @@ services:
       - OLLAMA_MODEL=llama3.2:3b
       - EMBED_MODEL=nomic-embed-text
       - CSV_PATH=data/social_media_comments.csv
+      - KNOWLEDGE_BASE_PATH=/app/knowledge-base
     depends_on:
       - ollama
       - chromadb
