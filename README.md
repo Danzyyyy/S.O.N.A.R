@@ -1,33 +1,33 @@
-# 🔍 S.O.N.A.R — Social Online Network Analytics & Response
+# 🔍 S.O.N.A.R — Social Online Network Analytics & Academic Response
 
 <p align="center">
   <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/OpenSearch-005EB8?style=for-the-badge&logo=opensearch&logoColor=white" alt="OpenSearch" />
   <img src="https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white" alt="Ollama" />
-  <img src="https://img.shields.io/badge/ChromaDB-FF6F00?style=for-the-badge&logo=databricks&logoColor=white" alt="ChromaDB" />
-  <img src="https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge&logo=chainlink&logoColor=white" alt="LangChain" />
   <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
-  <img src="https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11" />
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+" />
 </p>
 
 ---
 
 ## 📖 Tentang Proyek
 
-**S.O.N.A.R** (*Social Online Network Analytics & Response*) adalah sistem asisten AI berbasis **Retrieval-Augmented Generation (RAG)** dan **Multi-Model LLM** untuk investigasi mendalam akar penyebab (*root cause*) perubahan sentimen publik di media sosial.
+**S.O.N.A.R** adalah platform asisten cerdas berbasis **Retrieval-Augmented Generation (RAG)** yang mengintegrasikan:
+1. **Ollama LLM** (`llama3.2:3b` / `qwen2.5:3b`) untuk inferensi bahasa alami secara streaming.
+2. **OpenSearch 2.11** k-NN Vector Database (HNSW, Cosine Similarity) dengan embedding 768 dimensi via `nomic-embed-text`.
+3. **Knowledge Base Terstandar** untuk dokumen SOP Akademik (SOP Cuti Akademik, SOP Pendaftaran KRS) dan dataset analitik sentimen publik.
 
-Sistem ini membantu *public relations*, analis komunikasi, dan tim teknis untuk mengidentifikasi pemicu keluhan massal (misal: kendala transaksi QRIS, bug update aplikasi, lambatnya respons customer service) serta merumuskan strategi penanganan dan komunikasi krisis secara objektif berbasis data empiris.
+Sistem telah disesuaikan secara menyeluruh dengan spesifikasi **Pertemuan 6** (Modul 10: Knowledge Base, Modul 11: Embedding Generation, dan Modul 12: Integrasi OpenSearch).
 
 ---
 
-## ✨ Fitur Unggulan
+## ✨ Fitur Utama
 
-- 🎨 **Modern Conversational UI (Gemini / ChatGPT Aesthetic):** Tampilan *dark mode* bersih (`#131314`), floating input dock auto-resize, serta micro-interactions setara Claude dan Gemini.
-- 🔄 **Dynamic Multi-Model Switcher:** Beralih model LLM secara instan di antarmuka web antara **Meta Llama 3.2 (3B)** dan **Qwen 2.5 (3B)** tanpa perlu me-restart server.
-- ⚡ **Real-Time SSE Streaming & Stop Generation:** Respons dialirkan per token secara halus dengan dukungan tombol pembatalan (`■ Stop Generating`) berbasis `AbortController`.
-- 🧠 **ChromaDB Vector Store Retrieval:** Pencarian semantik dokumen keluhan netizen menggunakan model representasi semantik `nomic-embed-text`.
-- 📝 **Markdown & Code Highlighting:** Render otomatis tabel, list, kutipan, dan blok kode dengan tombol *"Salin Kode"* sekali klik.
-- 🗂️ **Session History (LocalStorage):** Riwayat sesi percakapan otomatis tersimpan di peramban pengguna, lengkap dengan tombol `+ Obrolan Baru` dan hapus sesi.
-- 🐳 **Full Containerization:** Orkestrasi terpadu multi-container via Docker Compose (Ollama, ChromaDB, dan FastAPI).
+- 🧠 **Vector Store k-NN Berkinerja Tinggi:** Menggunakan OpenSearch (algoritma HNSW) untuk pencarian dokumen semantik berbasis kemiripan makna (*semantic similarity*), bahkan tanpa adanya kesamaan kata kunci literal (*zero lexical overlap*).
+- 🔄 **Resilient Dual-Backend Fallback:** Mendukung OpenSearch sebagai database vektor utama dengan fallback otomatis yang aman ke penyimpanan lokal (ChromaDB) jika diperlukan.
+- 💬 **Modern Chatbot Web Interface:** Tampilan responsif dark-mode dengan dukungan SSE (*Server-Sent Events*) streaming token, auto-expand dock input, dan rendering Markdown.
+- 📚 **Knowledge Base Multi-Format Ingestion:** Ekstraksi otomatis dokumen SOP berformat Markdown (`.md`), PDF (`.pdf`), dan Teks (`.txt`).
+- 🐳 **Full Containerization:** Semua komponen (FastAPI, OpenSearch, OpenSearch Dashboards, Ollama) terorkestrasi secara terpadu melalui Docker Compose.
 
 ---
 
@@ -35,26 +35,23 @@ Sistem ini membantu *public relations*, analis komunikasi, dan tim teknis untuk 
 
 ```mermaid
 flowchart TD
-    User([Pengguna / Investigator]) -->|Input Query + Pilihan Model| WebUI[FastAPI Web Interface :8000]
+    User([Pengguna / Browser]) -->|Chat Stream & Search| API[FastAPI Application :8000]
     
     subgraph Docker Network
-        WebUI -->|SSE Stream / JSON| Engine[FastAPI App Engine]
+        API -->|Vector Retrieval k-NN| OS[(OpenSearch 2.11 :9200)]
+        API -->|Embedding & Chat Inference| Ollama[Ollama Service :11434]
         
-        Engine -->|Similarity Search| VectorStore[(ChromaDB :8000)]
-        Engine -->|Chat / Embedding Request| OllamaServer[Ollama Service :11434]
+        Dashboard[OpenSearch Dashboards :5601] -->|Visualisasi Indeks & Data| OS
         
         subgraph Ollama Models
-            Llama[llama3.2:3b]
-            Qwen[qwen2.5:3b]
-            Embed[nomic-embed-text]
+            M1[llama3.2:3b / qwen2.5:3b]
+            M2[nomic-embed-text 768-d]
         end
-        
-        OllamaServer --> Llama
-        OllamaServer --> Qwen
-        OllamaServer --> Embed
+        Ollama --> M1
+        Ollama --> M2
     end
-
-    Engine -->|Streaming Markdown Response| User
+    
+    API -->|SSE Stream / JSON| User
 ```
 
 ---
@@ -63,32 +60,41 @@ flowchart TD
 
 ```text
 ├── app/
-│   ├── __init__.py
-│   └── main.py                     # Backend FastAPI, API endpoints, & Single-File Modern Web UI
+│   ├── embeddings.py          # Utilitas pembuatan vektor embedding nomic-embed-text (Modul 11)
+│   ├── ingest.py              # Parser dokumen PDF/MD & ingestion pipeline (Modul 10 & 12)
+│   ├── vector_store.py        # Klien abstraksi k-NN OpenSearch dengan HNSW (Modul 12)
+│   └── main.py                # Backend FastAPI, REST API endpoints, & Chat Web Interface
+├── knowledge-base/            # SOP Akademik Terstandar (Modul 10)
+│   ├── sop-cuti-akademik.md   # Prosedur cuti akademik
+│   └── sop-pendaftaran-krs.md # Prosedur KRS & formula beban SKS berdasarkan IPS
 ├── data/
-│   └── social_media_comments.csv   # Dataset komentar media sosial (Twitter/X, IG, TikTok, YouTube)
-├── app.py                          # Antarmuka eksploratif alternatif (Streamlit RAG Dashboard)
-├── ingest.py                       # Script indexing dataset CSV ke ChromaDB Vector Store
-├── docker-compose.yml              # Konfigurasi orkestrasi Docker (ollama, chromadb, api)
-├── Dockerfile                      # Definisi container image backend FastAPI
-├── requirements.txt                # Dependensi pustaka Python
-├── Modelfile                       # Blueprint kustomisasi persona Ollama
-├── prompt_agentic_rag_s_o_n_a_r.md # Spesifikasi arsitektur Agentic RAG S.O.N.A.R
-├── prompt_redesign_ui_modern_ai.md # Spesifikasi desain antarmuka modern AI
-└── README.md                       # Dokumentasi resmi proyek
+│   └── social_media_comments.csv
+├── tests/                     # Suite pengujian lengkap (88 automated test cases)
+├── docker-compose.yml         # Konfigurasi container Ollama, OpenSearch, Dashboards, API
+├── requirements.txt           # Dependensi pustaka Python
+├── OPENSEARCH_RISK_ANALYSIS.md# Dokumen komprehensif analisis risiko penggunaan OpenSearch
+└── README.md
 ```
 
 ---
 
 ## 🚀 Panduan Instalasi & Menjalankan (Docker)
 
-Metode termudah dan direkomendasikan adalah menggunakan **Docker Compose**.
+Ikuti langkah-langkah mudah di bawah ini untuk menjalankan seluruh sistem langsung menggunakan Docker:
 
-### 1. Prasyarat
-Pastikan sistem Anda telah terpasang:
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (dengan engine Linux containers aktif)
-- [Git](https://git-scm.com/)
-- RAM minimal 8 GB disarankan untuk menjalankan model 3B
+### 1. Prasyarat Sistem
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (dengan engine Linux container aktif).
+- Disarankan alokasi RAM minimal 4 – 8 GB pada Docker Desktop.
+- **Konfigurasi Kernel OpenSearch (Penting)**:
+  OpenSearch membutuhkan nilai parameter virtual memory `vm.max_map_count` minimal `262144`.
+  - **Untuk Windows (PowerShell/CMD)**:
+    ```powershell
+    wsl -d docker-desktop sysctl -w vm.max_map_count=262144
+    ```
+  - **Untuk Linux**:
+    ```bash
+    sudo sysctl -w vm.max_map_count=262144
+    ```
 
 ---
 
@@ -101,139 +107,101 @@ cd S.O.N.A.R
 ---
 
 ### 3. Jalankan Docker Compose
-Bangun dan jalankan semua container di latar belakang:
+Jalankan seluruh service di latar belakang:
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 Periksa status container:
 ```bash
 docker compose ps
 ```
-Pastikan ketiga service berstatus `Up`:
+Pastikan seluruh service berstatus `Up` / `running`:
 - `fastapi_app` (Port `8000`)
-- `chroma_vector_store` (Port `8001:8000`)
+- `opensearch_node` (Port `9200`)
+- `opensearch_dashboards` (Port `5601`)
 - `ollama_service` (Port `11434`)
 
 ---
 
-### 4. Unduh Model LLM & Embedding ke Ollama
-Jalankan perintah berikut untuk mengunduh model yang dibutuhkan ke dalam container Ollama:
+### 4. Unduh Model ke dalam Container Ollama
+Jalankan perintah berikut untuk mengunduh model LLM dan embedding yang diperlukan:
 
 ```bash
-# Model Chat 1: Meta Llama 3.2 (3B)
-docker exec -it ollama_service ollama pull llama3.2:3b
+# Model Embedding (wajib untuk pencarian semantik vektor 768 dimensi):
+docker compose exec ollama ollama pull nomic-embed-text
 
-# Model Chat 2: Alibaba Qwen 2.5 (3B)
-docker exec -it ollama_service ollama pull qwen2.5:3b
-
-# Model Embeddings untuk Vector Search
-docker exec -it ollama_service ollama pull nomic-embed-text
+# Model LLM Chat:
+docker compose exec ollama ollama pull llama3.2:3b
 ```
 
 ---
 
-### 5. Lakukan Ingest Dataset ke ChromaDB
-Indeks seluruh data komentar media sosial ke dalam ChromaDB:
+### 5. Ingest Dokumen Knowledge Base ke OpenSearch
+Jalankan skrip ingestion untuk membaca dokumen di `knowledge-base/`, membuat representasi vektor, dan mengindeksnya ke OpenSearch:
 
 ```bash
-docker exec -it fastapi_app python ingest.py
+docker compose exec api python ingest.py
 ```
 
 *Output yang diharapkan:*
 ```text
-[Ingest] Menghubungkan ke ChromaDB di chromadb:8000...
-[Ingest] Membaca dataset dari data/social_media_comments.csv...
-[Ingest] Menginisialisasi embeddings (nomic-embed-text) via http://ollama:11434...
-[Ingest] Menyimpan 30 dokumen ke ChromaDB...
-[Ingest] Sukses melakukan indexing 30 dokumen!
-Selesai! Total dokumen terindeks: 30
+[INFO] Indeks 'knowledge-base' siap digunakan dengan pemetaan k-NN (HNSW).
+[INFO] Membaca dokumen dari /app/knowledge-base...
+[INFO] Berhasil mengindeks dokumen: sop-cuti-akademik.md
+[INFO] Berhasil mengindeks dokumen: sop-pendaftaran-krs.md
+[INFO] Ingestion selesai! Seluruh dokumen siap dicari secara semantik.
 ```
 
 ---
 
-### 6. Akses Aplikasi
-Buka peramban (browser) dan akses tautan berikut:
-- **Web Chatbot UI:** [http://localhost:8000](http://localhost:8000)
-- **Dokumentasi API Interaktif (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Status Kesehatan Sistem:** [http://localhost:8000/health](http://localhost:8000/health)
+### 6. Akses Layanan
+
+Buka browser Anda dan akses tautan berikut:
+
+| Layanan | URL | Deskripsi |
+| :--- | :--- | :--- |
+| **Web Chatbot UI** | [http://localhost:8000](http://localhost:8000) | Antarmuka interaktif tanya jawab SOP akademik & analisis |
+| **Swagger API Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | Dokumentasi OpenAPI & pengujian endpoint interaktif |
+| **OpenSearch Cluster** | [http://localhost:9200](http://localhost:9200) | Endpoint REST & status kesehatan cluster OpenSearch |
+| **OpenSearch Dashboards** | [http://localhost:5601](http://localhost:5601) | Antarmuka web visual untuk manajemen indeks OpenSearch |
 
 ---
 
-## 💻 Panduan Menjalankan Secara Lokal (Tanpa Docker)
+## 🧪 Menjalankan Pengujian (Automated Tests)
 
-Jika ingin menjalankan aplikasi langsung pada host OS (Python Virtual Environment):
+Project ini dilengkapi dengan **88 test cases** (unit test, integrasi k-NN, batasan dimensi, dan adversarial test) untuk memastikan seluruh fitur berjalan tanpa error:
 
-### 1. Buat Virtual Environment & Install Dependensi
 ```bash
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# Linux/macOS:
-source .venv/bin/activate
-
-pip install -r requirements.txt
+pytest -v
 ```
 
-### 2. Jalankan Ollama & ChromaDB
-- Pastikan [Ollama](https://ollama.com/) sudah berjalan di host (`http://localhost:11434`).
-- Jalankan model: `ollama pull llama3.2:3b` dan `ollama pull nomic-embed-text`.
-- Jalankan ChromaDB via docker: `docker run -d -p 8000:8000 chromadb/chroma:0.5.18`.
-
-### 3. Ingest Data
-```bash
-python ingest.py
-```
-
-### 4. Jalankan Aplikasi
-```bash
-# Menjalankan Web UI FastAPI:
-uvicorn app.main:app --reload --port 8000
-
-# Atau menjalankan Dashboard Streamlit:
-streamlit run app.py
+Hasil yang diharapkan:
+```text
+======================= 88 passed, 0 failed (100% LULUS) =======================
 ```
 
 ---
 
-## 📡 Dokumentasi API
+## ⚠️ Analisis Risiko Penggunaan OpenSearch
 
-FastAPI menyediakan dokumentasi interaktif OpenAPI di `/docs`.
-
-| Method | Endpoint | Deskripsi |
-|---|---|---|
-| `GET` | `/` | Antarmuka web utama S.O.N.A.R AI |
-| `GET` | `/health` | Memeriksa koneksi Ollama dan daftar model aktif |
-| `POST` | `/api/chat` | Mengirim pertanyaan dan menerima jawaban lengkap (non-streaming) |
-| `POST` | `/api/chat/stream` | Mengirim pertanyaan dan menerima teks streaming via Server-Sent Events (SSE) |
-| `GET` | `/docs` | Swagger UI interaktif |
-
-### Contoh Payload Request Chat:
-```json
-{
-  "message": "Apa penyebab utama kegagalan transaksi QRIS belakangan ini?",
-  "model": "qwen2.5:3b",
-  "temperature": 0.2,
-  "history": []
-}
-```
+Kajian teknis mendalam mengenai perbandingan OpenSearch dengan vector database alternatif, kebutuhan memori/JVM heap, amplifikasi disk, serta kompleksitas operasional dapat dibaca pada dokumen resmi:
+👉 **[Laporan Analisis Risiko OpenSearch (OPENSEARCH_RISK_ANALYSIS.md)](OPENSEARCH_RISK_ANALYSIS.md)**
 
 ---
 
-## 📊 Format Dataset
+## 🛠️ Troubleshooting Umum
 
-Dataset komentar tersimpan di `data/social_media_comments.csv` dengan struktur kolom:
-- `id` : Identifier unik komentar
-- `timestamp` : Waktu publikasi komentar (format ISO 8601)
-- `platform` : Sumber platform (`X`, `Instagram`, `TikTok`, `YouTube`)
-- `username` : Akun pengguna
-- `comment` : Isi teks komentar netizen
-- `sentiment` : Label sentimen (`positive`, `neutral`, `negative`)
-- `topic` : Topik pembahasan (misal: `qris`, `app_update_v2.4`, `customer_service`)
-- `likes` : Jumlah engagement / likes
+1. **OpenSearch Container Exit / Crash on Startup**:
+   - Periksa alokasi memori virtual kernel:
+     `wsl -d docker-desktop sysctl -w vm.max_map_count=262144`
+   - Pastikan Docker Desktop memiliki sisa memori RAM yang cukup.
+2. **Kueri Chat Menghasilkan Jawaban Tanpa Konteks**:
+   - Pastikan Anda sudah menjalankan langkah nomor 5 (`python ingest.py`) untuk memuat dokumen SOP ke dalam OpenSearch.
+3. **Status Cluster OpenSearch Berwarna "Yellow"**:
+   - Pada konfigurasi satu node (`discovery.type=single-node`), status yellow adalah kondisi normal karena tidak adanya node replica. Aplikasi dirancang untuk mengenali status ini secara aman.
 
 ---
 
-## 📄 Lisensi & Kontribusi
-
-Proyek ini didistribusikan untuk riset dan analitik sentimen media sosial. Kontribusi berupa saran fitur, pull request, dan perbaikan bug sangat disambut.
+## 📄 Lisensi
+Didistribusikan untuk riset dan kebutuhan akademik sesuai ketentuan tugas.

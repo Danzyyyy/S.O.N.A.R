@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from typing import List, Optional
 
@@ -8,14 +9,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.embeddings import embed_text
+from app.vector_store import VectorStore
+
+logger = logging.getLogger(__name__)
+
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+OPENSEARCH_BASE_URL = os.getenv("OPENSEARCH_BASE_URL", "http://localhost:9200").rstrip("/")
+OPENSEARCH_INDEX = os.getenv("OPENSEARCH_INDEX", "knowledge-base")
+EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 KNOWLEDGE_BASE_PATH = os.environ.get("KNOWLEDGE_BASE_PATH", "/app/knowledge-base")
 
 app = FastAPI(
-    title="S.O.N.A.R Social Media Chatbot API",
-    description="REST API backend terhubung dengan Ollama LLM untuk analisis media sosial & chatbot interaktif.",
-    version="1.0.0"
+    title="S.O.N.A.R Social Media & Academic Chatbot API",
+    description="REST API backend terhubung dengan Ollama LLM & OpenSearch Vector Store untuk analisis media sosial & asisten SOP akademik.",
+    version="1.1.0"
 )
 
 app.add_middleware(
@@ -46,9 +55,42 @@ class ChatResponse(BaseModel):
     done: bool = True
 
 
+class SearchQueryRequest(BaseModel):
+    query: str = Field(..., description="Teks kueri pencarian semantik")
+    k: Optional[int] = Field(default=3, ge=1, le=20, description="Jumlah dokumen teratas")
+    index_name: Optional[str] = Field(default=None, description="Nama index OpenSearch")
+
+
+class SearchHitItem(BaseModel):
+    id: str
+    score: float
+    text: str
+    metadata: dict = Field(default_factory=dict)
+
+
+class SearchQueryResponse(BaseModel):
+    query: str
+    total: int
+    results: List[SearchHitItem]
+
+
+def retrieve_relevant_context(query: str, k: int = 3, index_name: str = OPENSEARCH_INDEX) -> List[dict]:
+    """Mengambil dokumen relevan dari OpenSearch untuk RAG context injection."""
+    if not query or not query.strip():
+        return []
+    try:
+        vs = VectorStore(base_url=OPENSEARCH_BASE_URL, index_name=index_name)
+        query_vec = embed_text(query, base_url=OLLAMA_BASE_URL, model=EMBED_MODEL)
+        results = vs.search(index_name, query_vec, k=k)
+        return results
+    except Exception as e:
+        logger.debug(f"Retrieval context fallback (OpenSearch/Ollama tidak dapat diakses): {e}")
+        return []
+
+
 @app.get("/health", tags=["Status"])
 async def health_check():
-    """Memeriksa status API dan koneksi ke Ollama."""
+    """Memeriksa status API, koneksi ke Ollama, dan OpenSearch."""
     ollama_status = "unreachable"
     available_models = []
     chat_models = []
@@ -61,38 +103,128 @@ async def health_check():
                 for m in data.get("models", []):
                     name = m.get("name", "")
                     available_models.append(name)
-                    # Filter model non-embedding (chat models only)
                     if "embed" not in name.lower():
                         chat_models.append(name)
     except Exception as e:
         ollama_status = f"error: {str(e)}"
 
+    opensearch_status = "unreachable"
+    try:
+        vs = VectorStore(base_url=OPENSEARCH_BASE_URL, index_name=OPENSEARCH_INDEX)
+        h = vs.health()
+        if h.get("status") in ("green", "yellow"):
+            opensearch_status = f"connected ({h.get('status')})"
+        else:
+            opensearch_status = h.get("status", "unknown")
+    except Exception as e:
+        opensearch_status = f"error: {str(e)}"
+
     return {
         "status": "healthy",
         "ollama_base_url": OLLAMA_BASE_URL,
         "ollama_status": ollama_status,
+        "opensearch_base_url": OPENSEARCH_BASE_URL,
+        "opensearch_status": opensearch_status,
         "configured_model": OLLAMA_MODEL,
         "available_models": available_models,
         "chat_models": chat_models or ["llama3.2:3b", "qwen2.5:3b"]
     }
 
 
+@app.post("/api/search", response_model=SearchQueryResponse, tags=["Search"])
+@app.get("/api/search", response_model=SearchQueryResponse, tags=["Search"])
+async def search_endpoint(
+    q: Optional[str] = None,
+    query: Optional[str] = None,
+    k: int = 3,
+    payload: Optional[SearchQueryRequest] = None
+):
+    """Pencarian semantik k-NN langsung terhadap dokumen di OpenSearch."""
+    search_query = None
+    target_k = k
+    target_index = OPENSEARCH_INDEX
+
+    if payload:
+        search_query = payload.query
+        target_k = payload.k or k
+        if payload.index_name:
+            target_index = payload.index_name
+    elif query:
+        search_query = query
+    elif q:
+        search_query = q
+
+    if not search_query:
+        raise HTTPException(status_code=400, detail="Query parameter 'q' atau field 'query' wajib diisi.")
+
+    try:
+        vs = VectorStore(base_url=OPENSEARCH_BASE_URL, index_name=target_index)
+        query_vec = embed_text(search_query, base_url=OLLAMA_BASE_URL, model=EMBED_MODEL)
+        hits = vs.search(target_index, query_vec, k=target_k)
+        formatted_hits = [
+            SearchHitItem(
+                id=h["id"],
+                score=float(h.get("score") or 0.0),
+                text=h.get("text", ""),
+                metadata=h.get("metadata", {})
+            )
+            for h in hits
+        ]
+        return SearchQueryResponse(query=search_query, total=len(formatted_hits), results=formatted_hits)
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Gagal melakukan pencarian di OpenSearch ({OPENSEARCH_BASE_URL}): {str(e)}"
+        )
+
+
 @app.post("/api/chat", response_model=ChatResponse, tags=["Chat"])
 async def chat_endpoint(payload: ChatRequest):
-    """Mengirim pesan chat ke Ollama dan mendapatkan jawaban lengkap."""
+    """Mengirim pesan chat ke Ollama dengan RAG kontekstual dari OpenSearch."""
+    # INVARIANT CHECK: messages kosong harus HTTP 400
     if not payload.message and not payload.messages:
+        raise HTTPException(status_code=400, detail="messages kosong")
+    if payload.messages is not None and len(payload.messages) == 0 and not payload.message:
         raise HTTPException(status_code=400, detail="messages kosong")
 
     messages = []
     selected_model = payload.model or OLLAMA_MODEL
-    
+
+    # Ekstraksi pertanyaan pengguna untuk retrieval
+    user_query = ""
+    if payload.message:
+        user_query = payload.message
+    elif payload.messages:
+        for m in reversed(payload.messages):
+            if m.role == "user" and m.content:
+                user_query = m.content
+                break
+
+    # RAG Retrieval dari OpenSearch
+    rag_context = ""
+    if user_query:
+        docs = retrieve_relevant_context(user_query, k=3)
+        if docs:
+            snippets = []
+            for i, d in enumerate(docs, 1):
+                src = d.get("metadata", {}).get("source", f"Dokumen #{i}")
+                snippets.append(f"[{i}. Sumber: {src}]\n{d.get('text', '')}")
+            rag_context = "\n\n".join(snippets)
+
+    system_content = (
+        "Anda adalah S.O.N.A.R AI, asisten analis media sosial dan komunikasi publik profesional. "
+        "Berikan jawaban yang jelas, solutif, analitis, dan ramah menggunakan bahasa Indonesia yang baik."
+    )
+    if rag_context:
+        system_content += (
+            f"\n\nBerikut adalah konteks referensi / SOP pendukung yang relevan:\n{rag_context}\n\n"
+            "Gunakan referensi di atas untuk memberikan jawaban yang akurat dan berbasis fakta."
+        )
+
     # Tambahkan system prompt
     messages.append({
         "role": "system",
-        "content": (
-            "Anda adalah S.O.N.A.R AI, asisten analis media sosial dan komunikasi publik profesional. "
-            "Berikan jawaban yang jelas, solutif, analitis, dan ramah menggunakan bahasa Indonesia yang baik."
-        )
+        "content": system_content
     })
 
     # Tambahkan history
@@ -139,18 +271,49 @@ async def chat_endpoint(payload: ChatRequest):
 @app.post("/chat/stream", tags=["Chat"])
 async def chat_stream_endpoint(payload: ChatRequest):
     """Streaming respons chat dari Ollama secara real-time via Server-Sent Events (SSE)."""
+    # INVARIANT CHECK: messages kosong harus HTTP 400
     if not payload.message and not payload.messages:
+        raise HTTPException(status_code=400, detail="messages kosong")
+    if payload.messages is not None and len(payload.messages) == 0 and not payload.message:
         raise HTTPException(status_code=400, detail="messages kosong")
 
     messages = []
     selected_model = payload.model or OLLAMA_MODEL
 
+    # Ekstraksi pertanyaan pengguna untuk retrieval
+    user_query = ""
+    if payload.message:
+        user_query = payload.message
+    elif payload.messages:
+        for m in reversed(payload.messages):
+            if m.role == "user" and m.content:
+                user_query = m.content
+                break
+
+    # RAG Retrieval dari OpenSearch
+    rag_context = ""
+    if user_query:
+        docs = retrieve_relevant_context(user_query, k=3)
+        if docs:
+            snippets = []
+            for i, d in enumerate(docs, 1):
+                src = d.get("metadata", {}).get("source", f"Dokumen #{i}")
+                snippets.append(f"[{i}. Sumber: {src}]\n{d.get('text', '')}")
+            rag_context = "\n\n".join(snippets)
+
+    system_content = (
+        "Anda adalah S.O.N.A.R AI, asisten analis media sosial dan komunikasi publik profesional. "
+        "Berikan jawaban yang jelas, solutif, analitis, dan ramah menggunakan bahasa Indonesia yang baik."
+    )
+    if rag_context:
+        system_content += (
+            f"\n\nBerikut adalah konteks referensi / SOP pendukung yang relevan:\n{rag_context}\n\n"
+            "Gunakan referensi di atas untuk memberikan jawaban yang akurat dan berbasis fakta."
+        )
+
     messages.append({
         "role": "system",
-        "content": (
-            "Anda adalah S.O.N.A.R AI, asisten analis media sosial dan komunikasi publik profesional. "
-            "Berikan jawaban yang jelas, solutif, analitis, dan ramah menggunakan bahasa Indonesia yang baik."
-        )
+        "content": system_content
     })
     if payload.history:
         for item in payload.history:

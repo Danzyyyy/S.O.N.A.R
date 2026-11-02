@@ -22,6 +22,16 @@ chroma_data/
 .DS_Store
 Thumbs.db
 
-Pertemuan-6.docx
+# Documents & Prompts
+Pertemuan 6.docx
+Pertemuan*.docx
+*.docx
 prompt.md
+prompt*.md
 prompt_*.md
+
+# Agents & Test Caches
+.agents/
+.pytest_cache/
+.coverage
+htmlcov/
