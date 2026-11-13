@@ -72,7 +72,7 @@ flowchart TD
 ├── tests/                     # Suite pengujian lengkap (88 automated test cases)
 ├── docker-compose.yml         # Konfigurasi container Ollama, OpenSearch, Dashboards, API
 ├── requirements.txt           # Dependensi pustaka Python
-├── OPENSEARCH_RISK_ANALYSIS.md# Dokumen komprehensif analisis risiko penggunaan OpenSearch
+├── docs/OPENSEARCH_RISK_ANALYSIS.md# Dokumen komprehensif analisis risiko penggunaan OpenSearch
 └── README.md
 ```
 
@@ -186,7 +186,7 @@ Hasil yang diharapkan:
 ## ⚠️ Analisis Risiko Penggunaan OpenSearch
 
 Kajian teknis mendalam mengenai perbandingan OpenSearch dengan vector database alternatif, kebutuhan memori/JVM heap, amplifikasi disk, serta kompleksitas operasional dapat dibaca pada dokumen resmi:
-👉 **[Laporan Analisis Risiko OpenSearch (OPENSEARCH_RISK_ANALYSIS.md)](OPENSEARCH_RISK_ANALYSIS.md)**
+👉 **[Laporan Analisis Risiko OpenSearch (docs/OPENSEARCH_RISK_ANALYSIS.md)](docs/OPENSEARCH_RISK_ANALYSIS.md)**
 
 ---
 

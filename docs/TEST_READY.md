@@ -49,8 +49,8 @@ The end-to-end opaque-box test suite for **PDS Pertemuan 6 & OpenSearch Integrat
 
 ## 4. Key Artifacts Produced
 
-1. `d:\PDS\TEST_INFRA.md`: Full architectural specification of test tiers, execution commands, and dual-mode execution.
-2. `d:\PDS\TEST_READY.md`: Formal verification readiness declaration and audit signoff.
+1. `d:\PDS\docs\TEST_INFRA.md`: Full architectural specification of test tiers, execution commands, and dual-mode execution.
+2. `d:\PDS\docs\TEST_READY.md`: Formal verification readiness declaration and audit signoff.
 3. `d:\PDS\tests/test_doubles.py`: Mathematical simulation harness supporting in-memory k-NN cosine similarity and normalized 768-d embeddings.
 4. `d:\PDS\tests/conftest.py`: Test fixtures and automatic fallback probes.
 5. `d:\PDS\tests/test_tier1_feature_coverage.py`: Tier 1 feature tests.

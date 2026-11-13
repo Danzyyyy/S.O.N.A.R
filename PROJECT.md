@@ -22,7 +22,7 @@
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Risk Analysis Report | Generate comprehensive `OPENSEARCH_RISK_ANALYSIS.md` covering all R1 criteria | none | DONE |
+| M1 | Risk Analysis Report | Generate comprehensive `docs/OPENSEARCH_RISK_ANALYSIS.md` covering all R1 criteria | none | DONE |
 | M2 | Infrastructure & Dependencies | Configure `docker-compose.yml` for OpenSearch 2.11.0 + Dashboards, update `requirements.txt` | none | DONE |
 | M3 | Pertemuan 6 & Pipeline Integration | Knowledge base SOPs, `app/vector_store.py`, ingestion script, query pipeline adaptation | M2 | DONE |
 | M4 | E2E Verification & Forensic Audit | E2E testing suite, Challenger stress testing, and Forensic Integrity Audit | M1, M3 | DONE |
@@ -49,5 +49,5 @@
 - `app/ingest.py`: Document parser and ingestion engine.
 - `app/vector_store.py`: OpenSearch vector store client abstraction.
 - `app/main.py`: FastAPI server and endpoints.
-- `OPENSEARCH_RISK_ANALYSIS.md`: Comprehensive risk analysis report.
+- `docs/OPENSEARCH_RISK_ANALYSIS.md`: Comprehensive risk analysis report.
 - `tests/`: Integration and E2E verification tests.
