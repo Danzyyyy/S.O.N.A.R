@@ -198,7 +198,7 @@ def main():
         try:
             total_kb = ingest_knowledge_base(
                 kb_path=args.kb_dir,
-                base_url=OPENSEARCH_BASE_URL,
+                base_url=OLLAMA_BASE_URL,
                 embed_model=EMBED_MODEL,
                 index_name=OPENSEARCH_DOCS_INDEX,
             )

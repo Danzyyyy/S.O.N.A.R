@@ -18,6 +18,19 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip(
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 OPENSEARCH_BASE_URL = os.getenv("OPENSEARCH_BASE_URL", "http://localhost:9200").rstrip("/")
 OPENSEARCH_INDEX = os.getenv("OPENSEARCH_INDEX", "knowledge-base")
+OPENSEARCH_SOCIAL_INDEX = os.getenv("OPENSEARCH_SOCIAL_INDEX", "social-media-sentiments")
+# RAG: SOP (kecil, presisi) + komentar medsos (bukti netizen). Skor di bawah
+# RAG_MIN_SCORE dibuang (temuan Modul 15: skor 0.68-0.77 rapat, jadi filter
+# longgar saja, jangan asal ambil top-k). Snippet SOP dipotong supaya prompt
+# tidak membengkak: satu SOP utuh 15rb karakter bikin prompt ~3100 token dan
+# Ollama CPU (~45 tok/detik) kehabisan timeout 60 detik di FastAPI.
+RAG_TOP_K_SOP = 3
+RAG_TOP_K_COMMENTS = 5
+RAG_MIN_SCORE = 0.60
+SNIPPET_MAX_CHARS = 1200
+CONTEXT_MAX_CHARS = 7000
+CHAT_TIMEOUT = 180.0
+CHAT_MAX_TOKENS = 512
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 KNOWLEDGE_BASE_PATH = os.environ.get("KNOWLEDGE_BASE_PATH", "/app/knowledge-base")
 
@@ -74,18 +87,50 @@ class SearchQueryResponse(BaseModel):
     results: List[SearchHitItem]
 
 
-def retrieve_relevant_context(query: str, k: int = 3, index_name: str = OPENSEARCH_INDEX) -> List[dict]:
-    """Mengambil dokumen relevan dari OpenSearch untuk RAG context injection."""
+def _truncate(text: str, max_chars: int = SNIPPET_MAX_CHARS) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars].rstrip() + "\n... (dipotong, dokumen lengkap ada di knowledge-base)"
+
+
+def retrieve_relevant_context(
+    query: str,
+    k_sop: int = RAG_TOP_K_SOP,
+    k_comments: int = RAG_TOP_K_COMMENTS,
+    min_score: float = RAG_MIN_SCORE,
+) -> List[dict]:
+    """Mengambil dokumen relevan dari OpenSearch untuk RAG context injection.
+
+    Mencari di dua index sekaligus dengan satu embedding yang sama: SOP di
+    ``knowledge-base`` dan komentar netizen di ``social-media-sentiments``.
+    Setiap hasil ditandai ``kind`` = "sop" / "comment" dan skor di bawah
+    ``min_score`` dibuang. Kalau satu index gagal, index lain tetap dipakai.
+    """
     if not query or not query.strip():
         return []
     try:
-        vs = VectorStore(base_url=OPENSEARCH_BASE_URL, index_name=index_name)
         query_vec = embed_text(query, base_url=OLLAMA_BASE_URL, model=EMBED_MODEL)
-        results = vs.search(index_name, query_vec, k=k)
-        return results
     except Exception as e:
-        logger.debug(f"Retrieval context fallback (OpenSearch/Ollama tidak dapat diakses): {e}")
+        logger.debug(f"Retrieval context fallback (Ollama tidak dapat diakses): {e}")
         return []
+    results: List[dict] = []
+    for index_name, k, kind in (
+        (OPENSEARCH_INDEX, k_sop, "sop"),
+        (OPENSEARCH_SOCIAL_INDEX, k_comments, "comment"),
+    ):
+        try:
+            vs = VectorStore(base_url=OPENSEARCH_BASE_URL, index_name=index_name)
+            hits = vs.search(index_name, query_vec, k=k)
+            for h in hits:
+                if float(h.get("score") or 0.0) < min_score:
+                    continue
+                h = dict(h)
+                h["kind"] = kind
+                h["text"] = _truncate(h.get("text", ""))
+                results.append(h)
+        except Exception as e:
+            logger.debug(f"Retrieval {kind} gagal ({index_name}): {e}")
+    return results
 
 
 @app.get("/health", tags=["Status"])
@@ -200,16 +245,38 @@ async def chat_endpoint(payload: ChatRequest):
                 user_query = m.content
                 break
 
-    # RAG Retrieval dari OpenSearch
+    # RAG Retrieval dari OpenSearch (SOP + komentar medsos, dikelompokkan)
     rag_context = ""
     if user_query:
-        docs = retrieve_relevant_context(user_query, k=3)
+        docs = retrieve_relevant_context(user_query)
         if docs:
-            snippets = []
-            for i, d in enumerate(docs, 1):
-                src = d.get("metadata", {}).get("source", f"Dokumen #{i}")
-                snippets.append(f"[{i}. Sumber: {src}]\n{d.get('text', '')}")
-            rag_context = "\n\n".join(snippets)
+            sop_docs = [d for d in docs if d.get("kind") == "sop"]
+            comment_docs = [d for d in docs if d.get("kind") == "comment"]
+            sections = []
+            if sop_docs:
+                snippets = []
+                for i, d in enumerate(sop_docs, 1):
+                    src = d.get("metadata", {}).get("source", f"Dokumen #{i}")
+                    snippets.append(
+                        f"[{i}. Sumber: {src} | skor {float(d.get('score') or 0):.2f}]\n{d.get('text', '')}"
+                    )
+                sections.append("SOP pendukung:\n" + "\n\n".join(snippets))
+            if comment_docs:
+                snippets = []
+                for i, d in enumerate(comment_docs, 1):
+                    m = d.get("metadata", {}) or {}
+                    snippets.append(
+                        f"[{i}. {m.get('platform', '?')} | {m.get('sentiment', '?')} | "
+                        f"{m.get('topic', '?')} | {m.get('likes', 0)} likes | "
+                        f"@{m.get('username', '?')}] {d.get('text', '')}"
+                    )
+                sections.append(
+                    "Komentar media sosial (bukti netizen, jangan dikarang di luar ini):\n"
+                    + "\n".join(snippets)
+                )
+            rag_context = "\n\n".join(sections)
+            if len(rag_context) > CONTEXT_MAX_CHARS:
+                rag_context = rag_context[:CONTEXT_MAX_CHARS].rstrip() + "\n... (konteks dipotong)"
 
     system_content = (
         "Anda adalah S.O.N.A.R AI, asisten analis media sosial dan komunikasi publik profesional. "
@@ -239,13 +306,14 @@ async def chat_endpoint(payload: ChatRequest):
         messages.append({"role": "user", "content": payload.message})
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=CHAT_TIMEOUT) as client:
             req_data = {
                 "model": selected_model,
                 "messages": messages,
                 "stream": False,
                 "options": {
-                    "temperature": payload.temperature
+                    "temperature": payload.temperature,
+                    "num_predict": CHAT_MAX_TOKENS,
                 }
             }
             res = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=req_data)
@@ -290,16 +358,38 @@ async def chat_stream_endpoint(payload: ChatRequest):
                 user_query = m.content
                 break
 
-    # RAG Retrieval dari OpenSearch
+    # RAG Retrieval dari OpenSearch (SOP + komentar medsos, dikelompokkan)
     rag_context = ""
     if user_query:
-        docs = retrieve_relevant_context(user_query, k=3)
+        docs = retrieve_relevant_context(user_query)
         if docs:
-            snippets = []
-            for i, d in enumerate(docs, 1):
-                src = d.get("metadata", {}).get("source", f"Dokumen #{i}")
-                snippets.append(f"[{i}. Sumber: {src}]\n{d.get('text', '')}")
-            rag_context = "\n\n".join(snippets)
+            sop_docs = [d for d in docs if d.get("kind") == "sop"]
+            comment_docs = [d for d in docs if d.get("kind") == "comment"]
+            sections = []
+            if sop_docs:
+                snippets = []
+                for i, d in enumerate(sop_docs, 1):
+                    src = d.get("metadata", {}).get("source", f"Dokumen #{i}")
+                    snippets.append(
+                        f"[{i}. Sumber: {src} | skor {float(d.get('score') or 0):.2f}]\n{d.get('text', '')}"
+                    )
+                sections.append("SOP pendukung:\n" + "\n\n".join(snippets))
+            if comment_docs:
+                snippets = []
+                for i, d in enumerate(comment_docs, 1):
+                    m = d.get("metadata", {}) or {}
+                    snippets.append(
+                        f"[{i}. {m.get('platform', '?')} | {m.get('sentiment', '?')} | "
+                        f"{m.get('topic', '?')} | {m.get('likes', 0)} likes | "
+                        f"@{m.get('username', '?')}] {d.get('text', '')}"
+                    )
+                sections.append(
+                    "Komentar media sosial (bukti netizen, jangan dikarang di luar ini):\n"
+                    + "\n".join(snippets)
+                )
+            rag_context = "\n\n".join(sections)
+            if len(rag_context) > CONTEXT_MAX_CHARS:
+                rag_context = rag_context[:CONTEXT_MAX_CHARS].rstrip() + "\n... (konteks dipotong)"
 
     system_content = (
         "Anda adalah S.O.N.A.R AI, asisten analis media sosial dan komunikasi publik profesional. "
@@ -326,13 +416,14 @@ async def chat_stream_endpoint(payload: ChatRequest):
 
     async def event_generator():
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=CHAT_TIMEOUT) as client:
                 req_data = {
                     "model": selected_model,
                     "messages": messages,
                     "stream": True,
                     "options": {
-                        "temperature": payload.temperature
+                        "temperature": payload.temperature,
+                        "num_predict": CHAT_MAX_TOKENS,
                     }
                 }
                 async with client.stream("POST", f"{OLLAMA_BASE_URL}/api/chat", json=req_data) as response:
