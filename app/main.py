@@ -1,4 +1,4 @@
-import json
+﻿import json
 import logging
 import os
 from typing import List, Optional
@@ -10,9 +10,17 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.embeddings import embed_text
+from app.router import route_query
 from app.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
+# Fase 2a: log rute router harus terlihat di docker logs (root logger
+# bawaan uvicorn menahan INFO, jadi pasang handler INFO di sini).
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+# Redam log library (httpx/opensearch) supaya docker logs tetap bisa dibaca.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("opensearch").setLevel(logging.WARNING)
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
@@ -245,9 +253,19 @@ async def chat_endpoint(payload: ChatRequest):
                 user_query = m.content
                 break
 
-    # RAG Retrieval dari OpenSearch (SOP + komentar medsos, dikelompokkan)
-    rag_context = ""
+    # Fase 2a ΓÇö Router: tentukan rute sebelum retrieval (WEB_SEARCH
+    # belum didukung, diperlakukan sebagai VECTORSTORE di router.py)
+    route_info = {"route": "VECTORSTORE", "topic": "OTHER", "fallback": True}
     if user_query:
+        route_info = route_query(user_query, OLLAMA_BASE_URL)
+        logger.info("Router: route=%s topic=%s fallback=%s",
+                    route_info.get("route"), route_info.get("topic"),
+                    route_info.get("fallback"))
+
+    # RAG Retrieval dari OpenSearch (SOP + komentar medsos, dikelompokkan)
+    # DIRECT_CHAT melewati retrieval: jawab tanpa konteks SOP/komentar.
+    rag_context = ""
+    if user_query and route_info.get("route") != "DIRECT_CHAT":
         docs = retrieve_relevant_context(user_query)
         if docs:
             sop_docs = [d for d in docs if d.get("kind") == "sop"]
@@ -358,9 +376,19 @@ async def chat_stream_endpoint(payload: ChatRequest):
                 user_query = m.content
                 break
 
-    # RAG Retrieval dari OpenSearch (SOP + komentar medsos, dikelompokkan)
-    rag_context = ""
+    # Fase 2a ΓÇö Router: tentukan rute sebelum retrieval (WEB_SEARCH
+    # belum didukung, diperlakukan sebagai VECTORSTORE di router.py)
+    route_info = {"route": "VECTORSTORE", "topic": "OTHER", "fallback": True}
     if user_query:
+        route_info = route_query(user_query, OLLAMA_BASE_URL)
+        logger.info("Router: route=%s topic=%s fallback=%s",
+                    route_info.get("route"), route_info.get("topic"),
+                    route_info.get("fallback"))
+
+    # RAG Retrieval dari OpenSearch (SOP + komentar medsos, dikelompokkan)
+    # DIRECT_CHAT melewati retrieval: jawab tanpa konteks SOP/komentar.
+    rag_context = ""
+    if user_query and route_info.get("route") != "DIRECT_CHAT":
         docs = retrieve_relevant_context(user_query)
         if docs:
             sop_docs = [d for d in docs if d.get("kind") == "sop"]
@@ -447,13 +475,13 @@ async def chat_stream_endpoint(payload: ChatRequest):
 
 @app.get("/", response_class=HTMLResponse, tags=["Web UI"])
 async def serve_chatbot_ui():
-    """Tampilan web interaktif Chatbot S.O.N.A.R — Desain Modern AI Canvas (Gemini & ChatGPT style)."""
+    """Tampilan web interaktif Chatbot S.O.N.A.R ΓÇö Desain Modern AI Canvas (Gemini & ChatGPT style)."""
     html_content = """<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S.O.N.A.R — Social Media AI Analyst</title>
+    <title>S.O.N.A.R ΓÇö Social Media AI Analyst</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1441,25 +1469,25 @@ async def serve_chatbot_ui():
 
                     <div class="suggestions-grid">
                         <div class="prompt-card" onclick="sendSuggestion('Apa akar penyebab utama lonjakan keluhan transaksi QRIS yang timeout dan gagal belakangan ini?')">
-                            <div class="prompt-card-icon">💳</div>
+                            <div class="prompt-card-icon">≡ƒÆ│</div>
                             <div class="prompt-card-title">Isu Transaksi QRIS Gagal</div>
                             <div class="prompt-card-desc">Analisis faktor pemicu kegagalan payment gateway dan sentimen saldo terpotong.</div>
                         </div>
 
                         <div class="prompt-card" onclick="sendSuggestion('Bagaimana respon netizen terhadap update aplikasi v2.4 dan keluhan performa lag atau force close?')">
-                            <div class="prompt-card-icon">📱</div>
+                            <div class="prompt-card-icon">≡ƒô▒</div>
                             <div class="prompt-card-title">Respon Update App v2.4</div>
                             <div class="prompt-card-desc">Review keluhan bug, crash, dan perubahan UX pasca pembaruan versi.</div>
                         </div>
 
                         <div class="prompt-card" onclick="sendSuggestion('Mengapa netizen banyak mengeluhkan respon Customer Service yang lambat dan jawaban bot yang berulang?')">
-                            <div class="prompt-card-icon">🎧</div>
+                            <div class="prompt-card-icon">≡ƒÄº</div>
                             <div class="prompt-card-title">Analisis Komplain CS</div>
                             <div class="prompt-card-desc">Kajian waktu respon layanan pelanggan dan sentimen penanganan tiket kendala.</div>
                         </div>
 
                         <div class="prompt-card" onclick="sendSuggestion('Berikan rekomendasi rencana holding statement dan strategi mitigasi krisis komunikasi untuk meredakan komplain massal.')">
-                            <div class="prompt-card-icon">🛡️</div>
+                            <div class="prompt-card-icon">≡ƒ¢í∩╕Å</div>
                             <div class="prompt-card-title">Mitigasi Krisis Komunikasi</div>
                             <div class="prompt-card-desc">Rekomendasi pernyataan resmi dan mitigasi taktis lintas tim teknis & PR.</div>
                         </div>
@@ -1866,7 +1894,7 @@ async def serve_chatbot_ui():
             if (streaming) {
                 btnSend.disabled = false;
                 btnSend.classList.add('is-streaming');
-                btnSend.title = 'Stop Generating (■)';
+                btnSend.title = 'Stop Generating (Γûá)';
                 btnSend.innerHTML = '<i data-lucide="square" style="width:16px; height:16px;"></i>';
             } else {
                 btnSend.classList.remove('is-streaming');
@@ -2034,7 +2062,7 @@ async def serve_chatbot_ui():
                 } else {
                     thinkingBadge.remove();
                     assistantContent.style.display = 'block';
-                    assistantContent.innerHTML = `<span style="color:#f87171;">⚠️ Gagal mendapatkan jawaban: ${err.message}. Pastikan backend FastAPI & Ollama aktif.</span>`;
+                    assistantContent.innerHTML = `<span style="color:#f87171;">ΓÜá∩╕Å Gagal mendapatkan jawaban: ${err.message}. Pastikan backend FastAPI & Ollama aktif.</span>`;
                 }
             } finally {
                 setStreamingState(false);
