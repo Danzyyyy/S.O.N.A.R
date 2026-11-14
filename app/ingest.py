@@ -1,4 +1,4 @@
-"""
+﻿"""
 Ingestion module for knowledge-base documents (PDF, MD, TXT).
 Complies with Pertemuan 6 (Modules 10 and 12).
 """
@@ -71,26 +71,24 @@ def ingest_knowledge_base(
                     logger.warning(f"File {filename} kosong, dilewati.")
                     continue
 
-                logger.info(f"Membuat embedding via Ollama ({embed_model})...")
-                embedding = embed_text(content, base_url=ollama_url, model=embed_model)
+                from app.chunking import split_markdown_sections, chunk_to_metadata
 
-                metadata = {
-                    "source": filename,
-                    "path": file_path,
-                    "extension": os.path.splitext(filename)[1],
-                    "length": len(content),
-                }
+                chunks = split_markdown_sections(content, filename)
+                logger.info(f"Membuat {len(chunks)} chunk dari {filename}...")
+                for chunk in chunks:
+                    logger.info(f"Membuat embedding chunk {chunk.chunk_id} via Ollama ({embed_model})...")
+                    embedding = embed_text(chunk.text, base_url=ollama_url, model=embed_model)
 
-                logger.info(f"Mengindeks dokumen '{doc_id}' ke OpenSearch...")
-                vs.index_document(
-                    index_name=index_name,
-                    doc_id=doc_id,
-                    text=content,
-                    embedding=embedding,
-                    metadata=metadata,
-                )
-                ingested_count += 1
-                logger.info(f"Berhasil mengindeks {filename} (id={doc_id})")
+                    logger.info(f"Mengindeks chunk '{chunk.chunk_id}' ke OpenSearch...")
+                    vs.index_document(
+                        index_name=index_name,
+                        doc_id=chunk.chunk_id,
+                        text=chunk.text,
+                        embedding=embedding,
+                        metadata=chunk_to_metadata(chunk, filename, file_path),
+                    )
+                    ingested_count += 1
+                logger.info(f"Berhasil mengindeks {filename} ({len(chunks)} chunk, id={doc_id})")
 
             except Exception as e:
                 logger.error(f"Gagal memproses {filename}: {e}")
